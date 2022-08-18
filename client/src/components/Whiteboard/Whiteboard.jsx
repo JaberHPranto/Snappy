@@ -5,7 +5,14 @@ import rough from "roughjs";
 // configuring roughjs
 const roughGenerator = rough.generator();
 
-const Whiteboard = ({ canvasRef, ctxRef, elements, setElements, tool }) => {
+const Whiteboard = ({
+  canvasRef,
+  ctxRef,
+  elements,
+  setElements,
+  tool,
+  color,
+}) => {
   const [isDrawing, setIsDrawing] = useState(false);
 
   useEffect(() => {
@@ -13,8 +20,16 @@ const Whiteboard = ({ canvasRef, ctxRef, elements, setElements, tool }) => {
     canvas.height = window.innerHeight * 2;
     canvas.width = window.innerWidth * 2;
     const ctx = canvas.getContext("2d");
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
     ctxRef.current = ctx;
   }, []);
+
+  useEffect(() => {
+    ctxRef.current.strokeStyle = color;
+  }, [color]);
 
   useLayoutEffect(() => {
     const roughCanvas = rough.canvas(canvasRef.current);
@@ -38,11 +53,21 @@ const Whiteboard = ({ canvasRef, ctxRef, elements, setElements, tool }) => {
         });
       else if (el.type === "line") {
         roughCanvas.draw(
-          roughGenerator.line(el.offsetX, el.offsetY, el.width, el.height)
+          roughGenerator.line(el.offsetX, el.offsetY, el.width, el.height, {
+            stroke: el.stroke,
+          })
         );
       } else if (el.type === "rectangle") {
         roughCanvas.draw(
-          roughGenerator.rectangle(el.offsetX, el.offsetY, el.width, el.height)
+          roughGenerator.rectangle(
+            el.offsetX,
+            el.offsetY,
+            el.width,
+            el.height,
+            {
+              stroke: el.stroke,
+            }
+          )
         );
       }
     });
@@ -58,7 +83,7 @@ const Whiteboard = ({ canvasRef, ctxRef, elements, setElements, tool }) => {
           offsetX,
           offsetY,
           path: [[offsetX, offsetY]],
-          stroke: "black",
+          stroke: color,
         },
       ]);
     } else if (tool === "line") {
@@ -70,7 +95,7 @@ const Whiteboard = ({ canvasRef, ctxRef, elements, setElements, tool }) => {
           offsetY,
           width: offsetX,
           height: offsetY,
-          stroke: "black",
+          stroke: color,
         },
       ]);
     } else if (tool === "rectangle") {
@@ -82,7 +107,7 @@ const Whiteboard = ({ canvasRef, ctxRef, elements, setElements, tool }) => {
           offsetY,
           width: 0,
           height: 0,
-          stroke: "black",
+          stroke: color,
         },
       ]);
     }
