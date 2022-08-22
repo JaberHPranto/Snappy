@@ -1,12 +1,10 @@
 import React, { useState } from "react";
 import { useRef } from "react";
-import NewWhiteboard from "../../components/Whiteboard/NewWhiteboard";
-
 import Whiteboard from "../../components/Whiteboard/Whiteboard";
 import "./room.css";
 
 const RoomPage = () => {
-  const [tool, setTool] = useState("pencil");
+  const [tool, setTool] = useState("text");
   const [color, setColor] = useState("black");
   const [elements, setElements] = useState([]);
   const [history, setHistory] = useState([]);
@@ -56,7 +54,7 @@ const RoomPage = () => {
         {/* tools */}
         <div className="col-md-3 d-flex justify-content-between gap-1">
           <div className="d-flex gap-1">
-            <label htmlFor="pencil">Pencil</label>
+            <label htmlFor="pencil">P</label>
             <input
               type="radio"
               name="tool"
@@ -67,7 +65,7 @@ const RoomPage = () => {
             />
           </div>
           <div className="d-flex gap-1">
-            <label htmlFor="line">Line</label>
+            <label htmlFor="line">L</label>
             <input
               type="radio"
               name="tool"
@@ -78,7 +76,7 @@ const RoomPage = () => {
             />
           </div>
           <div className="d-flex gap-1">
-            <label htmlFor="rectangle">Rectangle</label>
+            <label htmlFor="rectangle">R</label>
             <input
               type="radio"
               name="tool"
@@ -89,13 +87,24 @@ const RoomPage = () => {
             />
           </div>
           <div className="d-flex gap-1">
-            <label htmlFor="selection">Selection</label>
+            <label htmlFor="selection">S</label>
             <input
               type="radio"
               name="tool"
               id="selection"
               checked={tool === "selection"}
               value="selection"
+              onChange={(e) => setTool(e.target.value)}
+            />
+          </div>
+          <div className="d-flex gap-1">
+            <label htmlFor="text">T</label>
+            <input
+              type="radio"
+              name="tool"
+              id="text"
+              checked={tool === "text"}
+              value="text"
               onChange={(e) => setTool(e.target.value)}
             />
           </div>
@@ -143,14 +152,6 @@ const RoomPage = () => {
           tool={tool}
           color={color}
         />
-        {/* <NewWhiteboard
-          canvasRef={canvasRef}
-          ctxRef={ctxRef}
-          elements={elements}
-          setElements={setElements}
-          tool={tool}
-          color={color}
-        /> */}
       </div>
     </div>
   );

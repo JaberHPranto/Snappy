@@ -1,5 +1,4 @@
-import React, { useLayoutEffect, useState } from "react";
-import { useEffect } from "react";
+import React, { useLayoutEffect, useState, useRef, useEffect } from "react";
 import rough from "roughjs";
 
 // configuring roughjs
@@ -15,6 +14,7 @@ const Whiteboard = ({
 }) => {
   const [action, setAction] = useState("none");
   const [selectedElement, setSelectedElement] = useState(null);
+  const textAreaRef = useRef();
 
   useEffect(() => {
     const canvas = canvasRef?.current;
@@ -32,9 +32,12 @@ const Whiteboard = ({
     ctxRef.current.strokeStyle = color;
   }, [color]);
 
-  // useEffect(() => {
-  //   console.log({ action });
-  // });
+  useEffect(() => {
+    const textArea = textAreaRef.current;
+    if (action === "writing") {
+      textArea.focus();
+    }
+  }, [action, selectedElement]);
 
   useLayoutEffect(() => {
     const roughCanvas = rough.canvas(canvasRef.current);
@@ -75,6 +78,9 @@ const Whiteboard = ({
             }
           )
         );
+      } else if (el.type === "text") {
+        ctxRef.current.font = "24px sans-serif";
+        ctxRef.current.fillText(el.text, el.offsetX, el.offsetY);
       }
     });
   }, [elements]);
@@ -85,6 +91,11 @@ const Whiteboard = ({
 
   const handleMouseDown = (e) => {
     const { offsetX, offsetY } = e.nativeEvent;
+    const { clientX, clientY } = e;
+
+    if (action === "writing") {
+      return;
+    }
 
     if (tool === "selection") {
       const element = getElementPosition(offsetX, offsetY);
@@ -133,8 +144,19 @@ const Whiteboard = ({
             id,
           },
         ]);
+      } else if (tool === "text") {
+        const newElement = {
+          type: "text",
+          offsetX: clientX,
+          offsetY: clientY,
+          stroke: color,
+          id,
+          text: "",
+        };
+        setElements((prevElements) => [...prevElements, newElement]);
+        setSelectedElement(newElement);
       }
-      setAction("drawing");
+      setAction(tool === "text" ? "writing" : "drawing");
     }
   };
 
@@ -231,19 +253,67 @@ const Whiteboard = ({
     }
   };
   const handleMouseUp = (e) => {
+    if (action === "writing") {
+      return;
+    }
     setAction("none");
     setSelectedElement(null);
   };
 
+  const [count, setCount] = useState(1);
+
+  const handleBlur = (e) => {
+    console.log(count);
+    if (count % 2 == 0) {
+      const { id, offsetX, offsetY, text } = selectedElement;
+      setElements((prevElements) =>
+        prevElements.map((el, i) => {
+          if (i === id)
+            return {
+              ...el,
+              text: e.target.value,
+            };
+          else return el;
+        })
+      );
+      console.log("oka");
+
+      setAction("none");
+      setSelectedElement(null);
+    }
+    setCount(count + 1);
+  };
+
   return (
-    <div
-      onMouseDown={handleMouseDown}
-      onMouseUp={handleMouseUp}
-      onMouseMove={handleMouseMove}
-      className="h-100 w-100 border border-3 border-dark overflow-hidden"
-    >
-      <canvas ref={canvasRef} />
-    </div>
+    <>
+      {action === "writing" && (
+        <textarea
+          ref={textAreaRef}
+          onBlur={handleBlur}
+          style={{
+            position: "fixed",
+            top: selectedElement.offsetY - 2,
+            left: selectedElement.offsetX,
+            margin: 0,
+            padding: 0,
+            border: 0,
+            outline: 0,
+            resize: "auto",
+            overflow: "hidden",
+            whiteSpace: "pre",
+            // background: "transparent",
+          }}
+        />
+      )}
+      <div
+        onMouseDown={handleMouseDown}
+        onMouseUp={handleMouseUp}
+        onMouseMove={handleMouseMove}
+        className="h-100 w-100 border border-3 border-dark overflow-hidden"
+      >
+        <canvas ref={canvasRef} />
+      </div>
+    </>
   );
 };
 
