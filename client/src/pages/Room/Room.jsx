@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import { useRef } from "react";
+import NewWhiteboard from "../../components/Whiteboard/NewWhiteboard";
+
 import Whiteboard from "../../components/Whiteboard/Whiteboard";
 import "./room.css";
 
@@ -86,6 +88,17 @@ const RoomPage = () => {
               onChange={(e) => setTool(e.target.value)}
             />
           </div>
+          <div className="d-flex gap-1">
+            <label htmlFor="selection">Selection</label>
+            <input
+              type="radio"
+              name="tool"
+              id="selection"
+              checked={tool === "selection"}
+              value="selection"
+              onChange={(e) => setTool(e.target.value)}
+            />
+          </div>
         </div>
         {/* color picker */}
         <div className="col-md-7">
@@ -130,6 +143,14 @@ const RoomPage = () => {
           tool={tool}
           color={color}
         />
+        {/* <NewWhiteboard
+          canvasRef={canvasRef}
+          ctxRef={ctxRef}
+          elements={elements}
+          setElements={setElements}
+          tool={tool}
+          color={color}
+        /> */}
       </div>
     </div>
   );

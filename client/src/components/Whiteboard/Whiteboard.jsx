@@ -13,7 +13,8 @@ const Whiteboard = ({
   tool,
   color,
 }) => {
-  const [isDrawing, setIsDrawing] = useState(false);
+  const [action, setAction] = useState("none");
+  const [selectedElement, setSelectedElement] = useState(null);
 
   useEffect(() => {
     const canvas = canvasRef?.current;
@@ -30,6 +31,10 @@ const Whiteboard = ({
   useEffect(() => {
     ctxRef.current.strokeStyle = color;
   }, [color]);
+
+  // useEffect(() => {
+  //   console.log({ action });
+  // });
 
   useLayoutEffect(() => {
     const roughCanvas = rough.canvas(canvasRef.current);
@@ -55,6 +60,7 @@ const Whiteboard = ({
         roughCanvas.draw(
           roughGenerator.line(el.offsetX, el.offsetY, el.width, el.height, {
             stroke: el.stroke,
+            strokeWidth: 2,
           })
         );
       } else if (el.type === "rectangle") {
@@ -73,50 +79,76 @@ const Whiteboard = ({
     });
   }, [elements]);
 
+  const getElementPosition = (x, y) => {
+    return elements.find((el) => isWithinElementBoundary(x, y, el));
+  };
+
   const handleMouseDown = (e) => {
     const { offsetX, offsetY } = e.nativeEvent;
-    if (tool === "pencil") {
-      setElements((prevElements) => [
-        ...prevElements,
-        {
-          type: "pencil",
-          offsetX,
-          offsetY,
-          path: [[offsetX, offsetY]],
-          stroke: color,
-        },
-      ]);
-    } else if (tool === "line") {
-      setElements((prevElements) => [
-        ...prevElements,
-        {
-          type: "line",
-          offsetX,
-          offsetY,
-          width: offsetX,
-          height: offsetY,
-          stroke: color,
-        },
-      ]);
-    } else if (tool === "rectangle") {
-      setElements((prevElements) => [
-        ...prevElements,
-        {
-          type: "rectangle",
-          offsetX,
-          offsetY,
-          width: 0,
-          height: 0,
-          stroke: color,
-        },
-      ]);
+
+    if (tool === "selection") {
+      const element = getElementPosition(offsetX, offsetY);
+      if (element) {
+        setAction("moving");
+        setSelectedElement(element);
+        console.log(element);
+      }
+    } else {
+      const id = elements.length;
+      if (tool === "pencil") {
+        setElements((prevElements) => [
+          ...prevElements,
+          {
+            type: "pencil",
+            offsetX,
+            offsetY,
+            path: [[offsetX, offsetY]],
+            stroke: color,
+            id,
+          },
+        ]);
+      } else if (tool === "line") {
+        setElements((prevElements) => [
+          ...prevElements,
+          {
+            type: "line",
+            offsetX,
+            offsetY,
+            width: offsetX,
+            height: offsetY,
+            stroke: color,
+            id,
+          },
+        ]);
+      } else if (tool === "rectangle") {
+        setElements((prevElements) => [
+          ...prevElements,
+          {
+            type: "rectangle",
+            offsetX,
+            offsetY,
+            width: 0,
+            height: 0,
+            stroke: color,
+            id,
+          },
+        ]);
+      }
+      setAction("drawing");
     }
-    setIsDrawing(true);
   };
 
   const handleMouseMove = (e) => {
     const { offsetX, offsetY } = e.nativeEvent;
-    if (isDrawing) {
+    const { clientX, clientY } = e;
+
+    if (tool === "selection") {
+      e.target.style.cursor = getElementPosition(offsetX, offsetY)
+        ? "move"
+        : "default";
+    }
+
+    if (action === "drawing") {
       // for pencil
       if (tool === "pencil") {
         //   very last element. we need to update the path
@@ -157,10 +189,50 @@ const Whiteboard = ({
           })
         );
       }
+    } else if (action === "moving") {
+      const {
+        type,
+        offsetX: x1,
+        offsetY: y1,
+        width: x2,
+        height: y2,
+        id,
+      } = selectedElement;
+
+      if (type === "line") {
+        setElements((prevElements) =>
+          prevElements.map((el, i) => {
+            if (i === id)
+              return {
+                ...el,
+                offsetX,
+                offsetY,
+                width: offsetX - x1 + x2,
+                height: offsetY - y1 + y2,
+              };
+            else return el;
+          })
+        );
+      } else if (type === "rectangle") {
+        setElements((prevElements) =>
+          prevElements.map((el, i) => {
+            if (i === id)
+              return {
+                ...el,
+                offsetX,
+                offsetY,
+                width: x2,
+                height: y2,
+              };
+            else return el;
+          })
+        );
+      }
     }
   };
   const handleMouseUp = (e) => {
-    setIsDrawing(false);
+    setAction("none");
+    setSelectedElement(null);
   };
 
   return (
@@ -173,6 +245,28 @@ const Whiteboard = ({
       <canvas ref={canvasRef} />
     </div>
   );
+};
+
+const isWithinElementBoundary = (x, y, element) => {
+  const { type, offsetX: x1, offsetY: y1, width: x2, height: y2 } = element;
+  // if our cursor/selection within rectangle or on line
+  if (type === "rectangle") {
+    // const left = x1;
+    // const right = x1 + x2;
+    // const top = y1;
+    // const bottom = y2 + y2;
+    return x1 + x2 > x && x1 < x && y1 + y2 > y && y1 < y;
+  } else if (type === "line") {
+    const a = { x: x1, y: y1 };
+    const b = { x: x2, y: y2 };
+    const c = { x, y };
+    const offset = distance(a, b) - (distance(a, c) + distance(b, c));
+    return Math.abs(offset) < 1 || (x2 > x && x1 < x && y2 > y && y1 < y);
+  }
+};
+
+const distance = (a, b) => {
+  return Math.sqrt(Math.pow(a.x - b.x, 2) - Math.pow(a.y - b.y, 2));
 };
 
 export default Whiteboard;
