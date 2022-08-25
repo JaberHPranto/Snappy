@@ -7,22 +7,33 @@ const roughGenerator = rough.generator();
 const THRESHOLD = 5;
 
 const createElement = (id, x1, y1, x2, y2, type, options = {}) => {
-  const roughElement =
-    type === "line"
-      ? roughGenerator.line(x1, y1, x2, y2, options)
-      : type === "circle"
-      ? roughGenerator.arc(
-          x1,
-          y1,
-          (x2 - x1) * 2,
-          (y2 - y1) * 2,
-          0,
-          Math.PI * 4,
-          false,
-          options
-        )
-      : roughGenerator.rectangle(x1, y1, x2 - x1, y2 - y1, options);
-  return { id, x1, y1, x2, y2, roughElement, type, options };
+  switch (type) {
+    case "line":
+    case "rectangle":
+    case "circle":
+      const roughElement =
+        type === "line"
+          ? roughGenerator.line(x1, y1, x2, y2, options)
+          : type === "circle"
+          ? roughGenerator.arc(
+              x1,
+              y1,
+              (x2 - x1) * 2,
+              (y2 - y1) * 2,
+              0,
+              Math.PI * 4,
+              false,
+              options
+            )
+          : roughGenerator.rectangle(x1, y1, x2 - x1, y2 - y1, options);
+      return { id, x1, y1, x2, y2, roughElement, type, options };
+
+    case "text":
+      return { id, x1, y1, x2, y2, text: "", type, options };
+
+    default:
+      throw new Error(`${type} type not recognized`);
+  }
 };
 
 const getPosition = (x, y, elements) => {
@@ -72,7 +83,9 @@ const positionWithinBoundary = (x, y, element) => {
         ? "inside"
         : null;
     return left || right || top || bottom || isInside;
-  }
+  } else if (type === "text") {
+    return x1 <= x && x <= x2 && y2 >= y && y1 <= y ? "inside" : null;
+  } else throw new Error(`${type} is not supported`);
 };
 
 const distance = (a, b) => {
@@ -109,7 +122,7 @@ const getCursorForPosition = (position) => {
 // so that all co-ordinates remain consistent irrespective of how we draw -> (x1,y1) <= (x2,y2).It helps for resizing
 const adjustElementCoordinates = (element) => {
   const { x1, y1, x2, y2, type } = element;
-  if (type === "rectangle") {
+  if (type === "rectangle" || type === "text") {
     const minX = Math.min(x1, x2);
     const maxX = Math.max(x1, x2);
     const minY = Math.min(y1, y2);
@@ -146,15 +159,42 @@ const resizeCoordinates = (mouseX, mouseY, position, coordinates) => {
   }
 };
 
+const drawElementOnCanvas = (roughCanvas, context, element) => {
+  switch (element.type) {
+    case "line":
+    case "rectangle":
+    case "circle":
+      roughCanvas.draw(element.roughElement);
+      break;
+    case "text":
+      context.textBaseline = "top";
+      context.font = "24px Handlee";
+      context.fillText(element.text, element.x1, element.y1);
+      break;
+    default:
+      throw new Error(`${element.type} type not recognized`);
+  }
+};
+
 const NewWhiteboard = () => {
   const [elements, setElements] = useState([]);
   const [action, setAction] = useState("none");
-  const [tool, setTool] = useState("line");
+  const [tool, setTool] = useState("text");
   const [color, setColor] = useState("#000000");
   const [selectedElement, setSelectedElement] = useState(null);
+  const [count, setCount] = useState(1);
 
   const canvasRef = useRef();
   const ctxRef = useRef();
+  const textareaRef = useRef();
+
+  useEffect(() => {
+    const textArea = textareaRef.current;
+    if (action === "writing") {
+      textArea.focus();
+      textArea.value = selectedElement?.text;
+    }
+  }, [action, selectedElement]);
 
   useLayoutEffect(() => {
     const canvas = canvasRef?.current;
@@ -165,8 +205,8 @@ const NewWhiteboard = () => {
     const roughCanvas = rough.canvas(canvas);
     ctx.lineCap = "arrow";
 
-    elements.forEach((el) => {
-      roughCanvas.draw(el.roughElement);
+    elements.forEach((element) => {
+      drawElementOnCanvas(roughCanvas, ctx, element);
     });
   }, [elements]);
 
@@ -175,6 +215,9 @@ const NewWhiteboard = () => {
   }, [color]);
 
   const handleMouseDown = (e) => {
+    if (action === "writing") {
+      return;
+    }
     const { clientX, clientY } = e;
     if (tool === "selection") {
       const element = getPosition(clientX, clientY, elements);
@@ -203,7 +246,7 @@ const NewWhiteboard = () => {
       );
       setElements((prevElements) => [...prevElements, element]);
       setSelectedElement(element);
-      setAction("drawing");
+      setAction(tool === "text" ? "writing" : "drawing");
     }
   };
   const handleMouseMove = (e) => {
@@ -249,16 +292,33 @@ const NewWhiteboard = () => {
       updatedElement(id, x1, y1, x2, y2, type, options);
     }
   };
-  const handleMouseUp = () => {
-    const element = elements[elements.length - 1];
-    const { id, type } = element;
-    if (action === "drawing" && type !== "circle") {
-      const { x1, y1, x2, y2 } = adjustElementCoordinates(element);
-      updatedElement(id, x1, y1, x2, y2, type, {
-        stroke: color,
-        strokeWidth: 2,
-      });
+  const handleMouseUp = (e) => {
+    const { clientX, clientY } = e;
+    if (action === "writing") {
+      return;
     }
+    if (selectedElement) {
+      // basically if we click on the selectedElement means we are on the same spot, then we go to text editing mode
+      if (
+        selectedElement.type === "text" &&
+        clientX === selectedElement.x1 + selectedElement.offsetX &&
+        clientY === selectedElement.y1 + selectedElement.offsetY
+      ) {
+        setAction("writing");
+        setCount((prevCount) => prevCount + 1);
+        return;
+      }
+      const element = elements[elements.length - 1];
+      const { id, type } = element;
+      if (action === "drawing" && type !== "circle") {
+        const { x1, y1, x2, y2 } = adjustElementCoordinates(element);
+        updatedElement(id, x1, y1, x2, y2, type, {
+          stroke: color,
+          strokeWidth: 2,
+        });
+      }
+    }
+
     setAction("none");
     setSelectedElement(null);
   };
@@ -274,11 +334,45 @@ const NewWhiteboard = () => {
   };
 
   const updatedElement = (id, x1, y1, x2, y2, type, options = {}) => {
-    const updatedElement = createElement(id, x1, y1, x2, y2, type, options);
-
     const allElements = [...elements];
-    allElements[id] = updatedElement;
+    switch (type) {
+      case "line":
+      case "rectangle":
+      case "circle":
+        allElements[id] = createElement(id, x1, y1, x2, y2, type, options);
+        break;
+      case "text":
+        const textWidth = ctxRef.current.measureText(options.text).width;
+        const textHeight = 16;
+        allElements[id] = {
+          ...createElement(
+            id,
+            x1,
+            y1,
+            x1 + textWidth,
+            y1 + textHeight,
+            type,
+            options
+          ),
+          text: options.text,
+        };
+      default:
+        break;
+    }
+
     setElements(allElements);
+  };
+
+  const handleBlur = (event) => {
+    if (count % 2 == 0) {
+      const { id, x1, y1, type } = selectedElement;
+      setAction("none");
+      setSelectedElement(null);
+      updatedElement(id, x1, y1, null, null, type, {
+        text: event.target.value,
+      });
+    }
+    setCount((prevCount) => prevCount + 1);
   };
 
   return (
@@ -329,6 +423,17 @@ const NewWhiteboard = () => {
             />
           </div>
           <div>
+            <label htmlFor="text">Text</label>
+            <input
+              type="radio"
+              name="tool"
+              id="text"
+              checked={tool === "text"}
+              value="text"
+              onChange={(e) => setTool(e.target.value)}
+            />
+          </div>
+          <div>
             <label htmlFor="selection">Selection</label>
             <input
               type="radio"
@@ -355,6 +460,20 @@ const NewWhiteboard = () => {
           </button>
         </div>
       </div>
+
+      {action === "writing" ? (
+        <textarea
+          onBlur={handleBlur}
+          ref={textareaRef}
+          style={{
+            position: "fixed",
+            top: selectedElement.y1,
+            left: selectedElement.x1,
+            fontFamily: "Indie Flower",
+            resize: "both",
+          }}
+        />
+      ) : null}
 
       <canvas
         id="canvas"
