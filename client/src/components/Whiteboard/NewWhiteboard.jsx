@@ -31,6 +31,9 @@ const createElement = (id, x1, y1, x2, y2, type, options = {}) => {
     case "text":
       return { id, x1, y1, x2, y2, text: "", type, options };
 
+    case "image":
+      return { id, x1, y1, x2, y2, imageSrc: options.imageSrc, type, options };
+
     default:
       throw new Error(`${type} type not recognized`);
   }
@@ -85,6 +88,13 @@ const positionWithinBoundary = (x, y, element) => {
     return left || right || top || bottom || isInside;
   } else if (type === "text") {
     return x1 <= x && x <= x2 && y2 >= y && y1 <= y ? "inside" : null;
+  } else if (type === "image") {
+    const minX = Math.min(x1, x1 + x2);
+    const maxX = Math.max(x1, x1 + x2);
+    const minY = Math.min(y1, y1 + y2);
+    const maxY = Math.max(y1, y1 + y2);
+
+    return minX <= x && x <= maxX && maxY >= y && minY <= y ? "inside" : null;
   } else throw new Error(`${type} is not supported`);
 };
 
@@ -171,6 +181,15 @@ const drawElementOnCanvas = (roughCanvas, context, element) => {
       context.font = "24px Handlee";
       context.fillText(element.text, element.x1, element.y1);
       break;
+    case "image":
+      context.drawImage(
+        element.imageSrc,
+        element.x1,
+        element.y1,
+        element.x2,
+        element.y2
+      );
+      break;
     default:
       throw new Error(`${element.type} type not recognized`);
   }
@@ -183,6 +202,7 @@ const NewWhiteboard = () => {
   const [color, setColor] = useState("#000000");
   const [selectedElement, setSelectedElement] = useState(null);
   const [count, setCount] = useState(1);
+  const [file, setFile] = useState(null);
 
   const canvasRef = useRef();
   const ctxRef = useRef();
@@ -194,7 +214,7 @@ const NewWhiteboard = () => {
       textArea.focus();
       textArea.value = selectedElement?.text;
     }
-  }, [action, selectedElement]);
+  });
 
   useLayoutEffect(() => {
     const canvas = canvasRef?.current;
@@ -267,20 +287,28 @@ const NewWhiteboard = () => {
     } else if (action === "moving") {
       const { id, x1, y1, x2, y2, type, offsetX, offsetY, options } =
         selectedElement;
-      const width = x2 - x1;
-      const height = y2 - y1;
-      const newX = clientX - offsetX;
-      const newY = clientY - offsetY;
+      if (type === "image") {
+        const width = x2 - x1;
+        const height = y2 - y1;
+        const newX = clientX - offsetX;
+        const newY = clientY - offsetY;
+        updatedElement(id, newX, newY, x2, y2, "image", options);
+      } else {
+        const width = x2 - x1;
+        const height = y2 - y1;
+        const newX = clientX - offsetX;
+        const newY = clientY - offsetY;
 
-      updatedElement(
-        id,
-        newX,
-        newY,
-        newX + width,
-        newY + height,
-        type,
-        options
-      );
+        updatedElement(
+          id,
+          newX,
+          newY,
+          newX + width,
+          newY + height,
+          type,
+          options
+        );
+      }
     } else if (action === "resizing") {
       const { id, type, position, options, ...coordinates } = selectedElement;
       const { x1, y1, x2, y2 } = resizeCoordinates(
@@ -339,6 +367,7 @@ const NewWhiteboard = () => {
       case "line":
       case "rectangle":
       case "circle":
+      case "image":
         allElements[id] = createElement(id, x1, y1, x2, y2, type, options);
         break;
       case "text":
@@ -373,6 +402,37 @@ const NewWhiteboard = () => {
       });
     }
     setCount((prevCount) => prevCount + 1);
+  };
+
+  const handleUpload = () => {
+    // const uploadedFile = e.target.files[0];
+    // console.log(uploadedFile);
+    const img = new Image();
+    // img.src = URL.createObjectURL(uploadedFile);
+    img.src =
+      "https://images.unsplash.com/photo-1661493817349-f3e37cc05d5d?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1170&q=80";
+    img.onload = () => {
+      const canvas = canvasRef.current;
+      const imageWidth = img.width * 0.25;
+      const imageHeight = img.height * 0.25;
+      const centerX = canvas.width / 2 - imageWidth / 2;
+      const centerY = canvas.height / 2 - imageHeight / 2;
+      // ctxRef.current.drawImage(img, centerX, centerY, imageWidth, imageHeight);
+
+      const element = createElement(
+        elements.length,
+        centerX,
+        centerY,
+        imageWidth,
+        imageHeight,
+        "image",
+        {
+          imageSrc: img,
+        }
+      );
+      setElements((prevElements) => [...prevElements, element]);
+      setSelectedElement(element);
+    };
   };
 
   return (
@@ -455,6 +515,10 @@ const NewWhiteboard = () => {
           </div>
         </div>
         <div>
+          <button className="btn btn-primary" onClick={handleUpload}>
+            Add
+          </button>
+          <input type="file" onChange={handleUpload} />
           <button className="btn btn-danger" onClick={handleClearCanvas}>
             Clear
           </button>
@@ -465,12 +529,17 @@ const NewWhiteboard = () => {
         <textarea
           onBlur={handleBlur}
           ref={textareaRef}
+          autoFocus
           style={{
             position: "fixed",
             top: selectedElement.y1,
             left: selectedElement.x1,
             fontFamily: "Indie Flower",
+            fontSize: "20px",
             resize: "both",
+            border: "none",
+            outline: "none",
+            backgroundColor: "transparent",
           }}
         />
       ) : null}
