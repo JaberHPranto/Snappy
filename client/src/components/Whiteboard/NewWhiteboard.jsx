@@ -94,7 +94,14 @@ const positionWithinBoundary = (x, y, element) => {
     const minY = Math.min(y1, y1 + y2);
     const maxY = Math.max(y1, y1 + y2);
 
-    return minX <= x && x <= maxX && maxY >= y && minY <= y ? "inside" : null;
+    const topLeft = nearPosition(x, y, x1, y1, "itl");
+    const topRight = nearPosition(x, y, x1 + x2, y1, "itr");
+    const bottomLeft = nearPosition(x, y, x1, y1 + y2, "ibl");
+    const bottomRight = nearPosition(x, y, x1 + x2, y1 + y2, "ibr");
+
+    const isInside =
+      minX <= x && x <= maxX && maxY >= y && minY <= y ? "inside" : null;
+    return topLeft || topRight || bottomLeft || bottomRight || isInside;
   } else throw new Error(`${type} is not supported`);
 };
 
@@ -111,10 +118,14 @@ const nearPosition = (x, y, x1, y1, position) => {
 const getCursorForPosition = (position) => {
   switch (position) {
     case "tl":
+    case "itl":
     case "br":
+    case "ibr":
       return "nwse-resize";
     case "tr":
+    case "itr":
     case "bl":
+    case "ibl":
       return "nesw-resize";
     case "rt":
     case "start":
@@ -164,6 +175,19 @@ const resizeCoordinates = (mouseX, mouseY, position, coordinates) => {
     case "rt":
     case "lt":
       return { x1, y1, x2: mouseX, y2 };
+    case "itl":
+      return {
+        x1: mouseX,
+        y1: mouseY,
+        x2: x2 + x1 - mouseX,
+        y2: y2 + y1 - mouseY,
+      };
+    case "itr":
+      return { x1, y1: mouseY, x2: mouseX - x1, y2: y2 + y1 - mouseY };
+    case "ibl":
+      return { x1: mouseX, y1, x2: x1 + x2 - mouseX, y2: mouseY - y1 };
+    case "ibr":
+      return { x1, y1, x2: mouseX - x1, y2: mouseY - y1 };
     default:
       return { x1, y1, x2, y2 };
   }
@@ -288,8 +312,6 @@ const NewWhiteboard = () => {
       const { id, x1, y1, x2, y2, type, offsetX, offsetY, options } =
         selectedElement;
       if (type === "image") {
-        const width = x2 - x1;
-        const height = y2 - y1;
         const newX = clientX - offsetX;
         const newY = clientY - offsetY;
         updatedElement(id, newX, newY, x2, y2, "image", options);
@@ -311,6 +333,7 @@ const NewWhiteboard = () => {
       }
     } else if (action === "resizing") {
       const { id, type, position, options, ...coordinates } = selectedElement;
+
       const { x1, y1, x2, y2 } = resizeCoordinates(
         clientX,
         clientY,
@@ -404,20 +427,19 @@ const NewWhiteboard = () => {
     setCount((prevCount) => prevCount + 1);
   };
 
-  const handleUpload = () => {
-    // const uploadedFile = e.target.files[0];
-    // console.log(uploadedFile);
+  const handleUpload = (e) => {
+    const uploadedFile = e.target.files[0];
     const img = new Image();
-    // img.src = URL.createObjectURL(uploadedFile);
-    img.src =
-      "https://images.unsplash.com/photo-1661493817349-f3e37cc05d5d?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1170&q=80";
+    img.src = URL.createObjectURL(uploadedFile);
+    // img.src =
+    //   "https://images.unsplash.com/photo-1661493817349-f3e37cc05d5d?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1170&q=80";
+
     img.onload = () => {
       const canvas = canvasRef.current;
       const imageWidth = img.width * 0.25;
       const imageHeight = img.height * 0.25;
       const centerX = canvas.width / 2 - imageWidth / 2;
       const centerY = canvas.height / 2 - imageHeight / 2;
-      // ctxRef.current.drawImage(img, centerX, centerY, imageWidth, imageHeight);
 
       const element = createElement(
         elements.length,
