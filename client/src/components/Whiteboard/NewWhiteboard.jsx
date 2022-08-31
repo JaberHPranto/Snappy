@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useRef } from "react";
 import { useLayoutEffect } from "react";
 import rough from "roughjs";
+import { getStroke } from "perfect-freehand";
 
 const roughGenerator = rough.generator();
 const THRESHOLD = 5;
@@ -30,6 +31,9 @@ const createElement = (id, x1, y1, x2, y2, type, options = {}) => {
 
     case "text":
       return { id, x1, y1, x2, y2, text: "", type, options };
+
+    case "pencil":
+      return { id, type, points: [{ x: x1, y: y1 }], options };
 
     case "image":
       return { id, x1, y1, x2, y2, imageSrc: options.imageSrc, type, options };
@@ -61,20 +65,13 @@ const positionWithinBoundary = (x, y, element) => {
     const isInside = x1 <= x && x <= x2 && y2 >= y && y1 <= y ? "inside" : null;
     return topLeft || topRight || bottomLeft || bottomRight || isInside;
   } else if (type === "line") {
-    const a = { x: x1, y: y1 };
-    const b = { x: x2, y: y2 };
-    const c = { x, y };
     // for resizing
     const start = nearPosition(x, y, x1, y1, "start");
     const end = nearPosition(x, y, x2, y2, "end");
-    const offset = distance(a, b) - (distance(a, c) + distance(b, c));
-    const isInside =
-      Math.abs(offset) < 1 || (x2 > x && x1 < x && y2 > y && y1 < y)
-        ? "inside"
-        : null;
-    return start || end || isInside;
+    const on = onLine(x1, y1, x2, y2, x, y);
+    return start || end || on;
   } else if (type === "circle") {
-    const r = ((x2 * x2) / (8 * y2) + y2 / 2) / 4;
+    const r = ((x2 * x2) / (8 * y2) + y2 / 2) / 8;
     const w = (x2 - x1) * 2;
     const h = (y2 - y1) * 2;
     const left = nearPosition(x, y, x1 + w / 2, y1, "lt");
@@ -88,6 +85,17 @@ const positionWithinBoundary = (x, y, element) => {
     return left || right || top || bottom || isInside;
   } else if (type === "text") {
     return x1 <= x && x <= x2 && y2 >= y && y1 <= y ? "inside" : null;
+  } else if (type === "pencil") {
+    const betweenAnyPoint = element.points.some((point, index) => {
+      const nextPointTuple = element.points[index + 1];
+      if (!nextPointTuple) return false;
+      return (
+        onLine(point.x, point.y, nextPointTuple.x, nextPointTuple.y, x, y, 5) !=
+        null
+      );
+    });
+
+    return betweenAnyPoint ? "inside" : null;
   } else if (type === "image") {
     const minX = Math.min(x1, x1 + x2);
     const maxX = Math.max(x1, x1 + x2);
@@ -103,6 +111,17 @@ const positionWithinBoundary = (x, y, element) => {
       minX <= x && x <= maxX && maxY >= y && minY <= y ? "inside" : null;
     return topLeft || topRight || bottomLeft || bottomRight || isInside;
   } else throw new Error(`${type} is not supported`);
+};
+
+const onLine = (x1, y1, x2, y2, x, y, maxDistance = 1) => {
+  const a = { x: x1, y: y1 };
+  const b = { x: x2, y: y2 };
+  const c = { x, y };
+  const offset = distance(a, b) - (distance(a, c) + distance(b, c));
+  return Math.abs(offset) < maxDistance ||
+    (x2 > x && x1 < x && y2 > y && y1 < y)
+    ? "inside"
+    : null;
 };
 
 const distance = (a, b) => {
@@ -193,6 +212,22 @@ const resizeCoordinates = (mouseX, mouseY, position, coordinates) => {
   }
 };
 
+function getSvgPathFromStroke(stroke) {
+  if (!stroke.length) return "";
+
+  const d = stroke.reduce(
+    (acc, [x0, y0], i, arr) => {
+      const [x1, y1] = arr[(i + 1) % arr.length];
+      acc.push(x0, y0, (x0 + x1) / 2, (y0 + y1) / 2);
+      return acc;
+    },
+    ["M", ...stroke[0], "Q"]
+  );
+
+  d.push("Z");
+  return d.join(" ");
+}
+
 const drawElementOnCanvas = (roughCanvas, context, element) => {
   switch (element.type) {
     case "line":
@@ -204,6 +239,14 @@ const drawElementOnCanvas = (roughCanvas, context, element) => {
       context.textBaseline = "top";
       context.font = "24px Handlee";
       context.fillText(element.text, element.x1, element.y1);
+      break;
+    case "pencil":
+      const outlinePoints = getStroke(element.points, {
+        size: 12,
+      });
+      const stroke = getSvgPathFromStroke(outlinePoints);
+      const myPath = new Path2D(stroke);
+      context.fill(myPath);
       break;
     case "image":
       context.drawImage(
@@ -219,10 +262,14 @@ const drawElementOnCanvas = (roughCanvas, context, element) => {
   }
 };
 
+const isAdjustmentRequired = (type) => {
+  return type !== "circle" && type !== "pencil";
+};
+
 const NewWhiteboard = () => {
   const [elements, setElements] = useState([]);
   const [action, setAction] = useState("none");
-  const [tool, setTool] = useState("text");
+  const [tool, setTool] = useState("pencil");
   const [color, setColor] = useState("#000000");
   const [selectedElement, setSelectedElement] = useState(null);
   const [count, setCount] = useState(1);
@@ -266,9 +313,16 @@ const NewWhiteboard = () => {
     if (tool === "selection") {
       const element = getPosition(clientX, clientY, elements);
       if (element) {
-        const offsetX = clientX - element.x1;
-        const offsetY = clientY - element.y1;
-        setSelectedElement({ ...element, offsetX, offsetY });
+        if (element.type === "pencil") {
+          // calculating offsets for every point
+          const xOffsets = element.points.map((point) => clientX - point.x);
+          const yOffsets = element.points.map((point) => clientY - point.y);
+          setSelectedElement({ ...element, xOffsets, yOffsets });
+        } else {
+          const offsetX = clientX - element.x1;
+          const offsetY = clientY - element.y1;
+          setSelectedElement({ ...element, offsetX, offsetY });
+        }
         if (element.position === "inside") {
           setAction("moving");
         } else setAction("resizing");
@@ -309,27 +363,42 @@ const NewWhiteboard = () => {
         strokeWidth: 2,
       });
     } else if (action === "moving") {
-      const { id, x1, y1, x2, y2, type, offsetX, offsetY, options } =
-        selectedElement;
-      if (type === "image") {
-        const newX = clientX - offsetX;
-        const newY = clientY - offsetY;
-        updatedElement(id, newX, newY, x2, y2, "image", options);
+      if (selectedElement.type === "pencil") {
+        const newPoints = selectedElement.points.map((_, index) => {
+          return {
+            x: clientX - selectedElement.xOffsets[index],
+            y: clientY - selectedElement.yOffsets[index],
+          };
+        });
+        const allElements = [...elements];
+        allElements[selectedElement.id] = {
+          ...allElements[selectedElement.id],
+          points: newPoints,
+        };
+        setElements(allElements);
       } else {
-        const width = x2 - x1;
-        const height = y2 - y1;
-        const newX = clientX - offsetX;
-        const newY = clientY - offsetY;
+        const { id, x1, y1, x2, y2, type, offsetX, offsetY, options } =
+          selectedElement;
+        if (type === "image") {
+          const newX = clientX - offsetX;
+          const newY = clientY - offsetY;
+          updatedElement(id, newX, newY, x2, y2, "image", options);
+        } else {
+          const width = x2 - x1;
+          const height = y2 - y1;
+          const newX = clientX - offsetX;
+          const newY = clientY - offsetY;
 
-        updatedElement(
-          id,
-          newX,
-          newY,
-          newX + width,
-          newY + height,
-          type,
-          options
-        );
+          updatedElement(
+            id,
+            newX,
+            newY,
+            newX + width,
+            newY + height,
+            type,
+            options
+          );
+        }
       }
     } else if (action === "resizing") {
       const { id, type, position, options, ...coordinates } = selectedElement;
@@ -361,7 +430,7 @@ const NewWhiteboard = () => {
       }
       const element = elements[elements.length - 1];
       const { id, type } = element;
-      if (action === "drawing" && type !== "circle") {
+      if (action === "drawing" && isAdjustmentRequired(type)) {
         const { x1, y1, x2, y2 } = adjustElementCoordinates(element);
         updatedElement(id, x1, y1, x2, y2, type, {
           stroke: color,
@@ -392,6 +461,9 @@ const NewWhiteboard = () => {
       case "circle":
       case "image":
         allElements[id] = createElement(id, x1, y1, x2, y2, type, options);
+        break;
+      case "pencil":
+        allElements[id].points = [...allElements[id].points, { x: x2, y: y2 }];
         break;
       case "text":
         const textWidth = ctxRef.current.measureText(options.text).width;
@@ -479,6 +551,17 @@ const NewWhiteboard = () => {
               id="line"
               checked={tool === "line"}
               value="line"
+              onChange={(e) => setTool(e.target.value)}
+            />
+          </div>
+          <div>
+            <label htmlFor="pencil">Pencil</label>
+            <input
+              type="radio"
+              name="tool"
+              id="pencil"
+              checked={tool === "pencil"}
+              value="pencil"
               onChange={(e) => setTool(e.target.value)}
             />
           </div>
