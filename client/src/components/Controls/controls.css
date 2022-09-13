@@ -1,0 +1,53 @@
+.controls_container {
+  position: fixed;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* background-color: skyblue; */
+}
+.controls_basic {
+  display: flex;
+  background-color: white;
+  padding: 0.5rem;
+  margin-top: 1rem;
+  box-shadow: rgba(0, 0, 0, 0.01) 0px 0px 0px 1px,
+    rgba(0, 0, 0, 0.15) 1px 1px 5px 0px;
+  border-radius: 18px;
+}
+
+.control {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+}
+
+.control-icon {
+  width: 30px;
+}
+
+.control_file-input {
+  margin-left: 0.8rem;
+  margin-right: 0.8rem;
+}
+
+.control input[type="radio"] {
+  opacity: 0.011;
+  z-index: 100;
+}
+
+.control input[type="radio"]:checked + label {
+  background: #afdbf5;
+  border-radius: 4px;
+}
+
+.control label {
+  cursor: pointer;
+  z-index: 90;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 8px;
+  line-height: 1.8em;
+}
