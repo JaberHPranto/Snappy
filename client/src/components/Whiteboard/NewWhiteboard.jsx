@@ -11,6 +11,11 @@ import {
 } from "../../utils/coordinates";
 import "./whiteboard.css";
 import Controls from "../Controls/Controls";
+import { CgUndo, CgRedo } from "react-icons/cg";
+import { BsQuestionCircleFill } from "react-icons/bs";
+import LeftMenu from "../Menu/LeftMenu";
+import { canvasBackgroundState } from "../../atoms/canvasAtom";
+import { useRecoilValue } from "recoil";
 
 const roughGenerator = rough.generator();
 
@@ -114,6 +119,8 @@ const NewWhiteboard = () => {
   const [file, setFile] = useState(null);
   const [history, setHistory] = useState([]);
 
+  const canvasBackground = useRecoilValue(canvasBackgroundState);
+
   const canvasRef = useRef();
   const ctxRef = useRef();
   const textareaRef = useRef();
@@ -143,6 +150,33 @@ const NewWhiteboard = () => {
   useEffect(() => {
     ctxRef.current.strokeStyle = color;
   }, [color]);
+
+  // detecting key press
+  useEffect(() => {
+    const handleKeyPress = (e) => {
+      if (action !== "writing") {
+        if (e.key === "s" || e.key === "S" || e.key === "6") {
+          setTool("selection");
+        } else if (e.key === "r" || e.key === "R" || e.key === "3") {
+          setTool("rectangle");
+        } else if (e.key === "c" || e.key === "C" || e.key === "4") {
+          setTool("circle");
+        } else if (e.key === "l" || e.key === "L" || e.key === "1") {
+          setTool("line");
+        } else if (e.key === "p" || e.key === "P" || e.key === "2") {
+          setTool("pencil");
+        } else if (e.key === "t" || e.key === "T" || e.key === "5") {
+          setTool("text");
+        }
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyPress);
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyPress);
+    };
+  }, [action]);
 
   const handleMouseDown = (e) => {
     if (action === "writing") {
@@ -280,6 +314,9 @@ const NewWhiteboard = () => {
       }
     }
 
+    if (tool === "circle" || tool === "rectangle") {
+      setTool("selection");
+    }
     setAction("none");
     setSelectedElement(null);
   };
@@ -360,6 +397,7 @@ const NewWhiteboard = () => {
     };
   };
   const handleClearCanvas = () => {
+    console.log("oka");
     ctxRef.current.clearRect(
       0,
       0,
@@ -385,35 +423,33 @@ const NewWhiteboard = () => {
 
   return (
     <div className="whiteboard-container">
+      {/* Left Menu */}
+      <LeftMenu handleClearCanvas={handleClearCanvas} />
       {/* Controls */}
       <Controls
         tool={tool}
         setTool={setTool}
         color={color}
         setColor={setColor}
-        handleClearCanvas={handleClearCanvas}
         handleUpload={handleUpload}
       />
-      <div
-        style={{
-          position: "fixed",
-          bottom: "10px",
-          right: "10px",
-        }}
-      >
+      <div className="control-buttons">
         <button
-          className="btn btn-primary mx-2"
+          className="controlBtn"
           disabled={elements.length === 0}
           onClick={handleUndo}
         >
-          Undo
+          <CgUndo size={22} />
         </button>
         <button
-          className="btn btn-outline-primary"
+          className="controlBtn"
           disabled={history.length < 1}
           onClick={handleRedo}
         >
-          Redo
+          <CgRedo size={22} />
+        </button>
+        <button className="controlBtn">
+          <BsQuestionCircleFill size={25} />
         </button>
       </div>
 
@@ -438,8 +474,9 @@ const NewWhiteboard = () => {
 
       <canvas
         id="canvas"
-        width={window.innerWidth - 10}
-        height={window.innerHeight - 10}
+        className={`${canvasBackground}`}
+        width={window.innerWidth}
+        height={window.innerHeight}
         ref={canvasRef}
         onMouseDown={handleMouseDown}
         onMouseUp={handleMouseUp}

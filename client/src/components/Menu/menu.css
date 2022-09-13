@@ -1,0 +1,48 @@
+/* Left menu */
+.left_menu-buttons {
+  position: fixed;
+  left: 10px;
+  top: 1rem;
+  padding: 10px;
+  background-color: white;
+  color: #343a40;
+  box-shadow: rgba(0, 0, 0, 0.01) 0px 0px 0px 1px,
+    rgba(0, 0, 0, 0.15) 1px 1px 5px 0px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  border-radius: 8px;
+  z-index: 10;
+}
+
+.leftMenuBtn {
+  padding: 10px 12px;
+  border: none;
+  outline: none;
+  border-radius: 8px;
+  margin-right: 8px;
+  text-align: center;
+  background-color: #e9ecef;
+  cursor: pointer;
+}
+
+.leftMenuBtn:last-child {
+  margin-right: 0px;
+}
+
+/* drawer content */
+.backgroundWrapper {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-top: 1rem;
+}
+.backgroundItem {
+  height: 72px;
+  outline: none;
+  border: none;
+  border-radius: 5px;
+  /* border: 1px solid; */
+  box-shadow: rgba(0, 0, 0, 0.01) 0px 0px 0px 1px,
+    rgba(0, 0, 0, 0.15) 1px 1px 4px 0px;
+}

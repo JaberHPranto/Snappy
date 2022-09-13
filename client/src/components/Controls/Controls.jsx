@@ -7,14 +7,7 @@ import { MdOutlineColorLens } from "react-icons/md";
 import { RiImageAddLine } from "react-icons/ri";
 import "../Controls/controls.css";
 
-const Controls = ({
-  tool,
-  setTool,
-  color,
-  setColor,
-  handleUpload,
-  handleClearCanvas,
-}) => {
+const Controls = ({ tool, setTool, color, setColor, handleUpload }) => {
   return (
     <div className="controls_container">
       <div className="controls_basic">
@@ -119,11 +112,7 @@ const Controls = ({
           </label>
         </div>
       </div>
-      <div>
-        {/* <button className="btn btn-danger" onClick={handleClearCanvas}>
-          Clear
-        </button> */}
-      </div>
+      <div></div>
     </div>
   );
 };

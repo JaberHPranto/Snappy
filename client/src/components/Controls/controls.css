@@ -48,6 +48,6 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 8px;
+  padding: 8px 4px;
   line-height: 1.8em;
 }

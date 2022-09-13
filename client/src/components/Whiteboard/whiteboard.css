@@ -1,4 +1,63 @@
-.whiteboard-container {
+/* Canvas background */
+.dot {
   background-image: url("../../images/canvas_background/dot.png");
-  background-color: #cccccc;
+}
+.brick {
+  background-image: url("../../images/canvas_background/brick.png");
+}
+.bubble {
+  background-image: url("../../images/canvas_background/bubble.png");
+}
+.colorful {
+  background-image: url("../../images/canvas_background/colorful.png");
+}
+.doodle {
+  background-image: url("../../images/canvas_background/doodles.png");
+}
+.sakura {
+  background-image: url("../../images/canvas_background/sakura.png");
+}
+.weather {
+  background-image: url("../../images/canvas_background/weather.png");
+}
+.blue {
+  background-image: url("../../images/canvas_background/blue.png");
+}
+.green {
+  background-image: url("../../images/canvas_background/green.png");
+}
+.red {
+  background-image: url("../../images/canvas_background/red.png");
+}
+.yellow {
+  background-image: url("../../images/canvas_background/yellow.png");
+}
+
+.control-buttons {
+  position: fixed;
+  right: 15px;
+  bottom: 15px;
+  padding: 6px;
+  background-color: white;
+  color: #343a40;
+  box-shadow: rgba(0, 0, 0, 0.01) 0px 0px 0px 1px,
+    rgba(0, 0, 0, 0.15) 1px 1px 5px 0px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  border-radius: 8px;
+}
+.controlBtn {
+  padding: 6px 12px;
+  border: none;
+  outline: none;
+  border-radius: 8px;
+  margin-right: 8px;
+  text-align: center;
+  background-color: #e9ecef;
+}
+
+.controlBtn:last-child {
+  margin-right: 0px;
+  background-color: transparent;
 }
